@@ -91,7 +91,12 @@ export class GameScene extends Phaser.Scene {
         color: '#0b110b'
       }).setOrigin(0.5);
       rect.setInteractive({ useHandCursor: true });
-      const press = () => { this.pressed.add(d.k); };
+      const press = () => {
+        this.pressed.add(d.k);
+        if (d.k === 'jump') this.edges.jumpEdge = true;
+        if (d.k === 'grab') this.edges.grabEdge = true;
+        if (d.k === 'dig') this.edges.digEdge = true;
+      };
       const release = () => { this.pressed.delete(d.k); };
       rect.on('pointerdown', press);
       rect.on('pointerup', release);
@@ -142,11 +147,12 @@ export class GameScene extends Phaser.Scene {
   readInput() {
     const k = this.keyState;
     const held = (a, b) => a.isDown || (b && b.isDown);
+    const touch = (name) => this.pressed.has(name);
     return {
-      left: held(k.left, k.a),
-      right: held(k.right, k.d),
-      up: held(k.up, k.w),
-      down: held(k.down, k.s),
+      left: held(k.left, k.a) || touch('left'),
+      right: held(k.right, k.d) || touch('right'),
+      up: held(k.up, k.w) || touch('up'),
+      down: held(k.down, k.s) || touch('down'),
       jumpEdge: this.edges.jumpEdge,
       grabEdge: this.edges.grabEdge,
       digEdge: this.edges.digEdge

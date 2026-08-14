@@ -130,9 +130,19 @@ export class Game {
       this.updateFree(input, dt);
     }
 
+    if (input.grabEdge) {
+      if (s.pose === POSE.ROPE) {
+        s.pose = POSE.AIR;
+        s.ropeCol = null;
+        s.vy = 0;
+        s.y += 4;
+      } else if (s.pose !== POSE.CLIMB) {
+        this.tryRope();
+      }
+    }
+
     if (s.pose !== POSE.CLIMB && s.pose !== POSE.ROPE) {
       this.tryLadder(input);
-      if (s.pose !== POSE.CLIMB && s.pose !== POSE.ROPE) this.tryRope(input);
     }
     this.checkDig(input);
   }
@@ -279,8 +289,7 @@ export class Game {
     }
   }
 
-  tryRope(input) {
-    if (!input.grabEdge) return;
+  tryRope() {
     const s = this.stickman;
     const cx = s.x + STICK_W / 2;
     for (let c = 0; c < 22; c++) {
@@ -336,13 +345,6 @@ export class Game {
       s.pose = POSE.AIR;
       s.ropeCol = null;
       s.vx = (input.left ? -1 : 1) * WALK * 0.5;
-      return;
-    }
-    if (input.grabEdge) {
-      s.pose = POSE.AIR;
-      s.ropeCol = null;
-      s.vy = 0;
-      s.y += 4;
       return;
     }
     if (s.y + STICK_H >= bottom && solidAt(this.parsed.tiles, this.holes, c, Math.floor((bottom + 1) / TILE))) {

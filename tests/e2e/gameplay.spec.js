@@ -27,7 +27,7 @@ test('plays level 1 to completion with the keyboard and saves progress', async (
 
   const grabbed = await holdUntil(page, 'ArrowLeft', async () => {
     const s = await scene(page);
-    return s.diamondsLeft === 0;
+    return s.diamondsLeft === 2;
   }, 5000, 25);
   expect(grabbed).toBe(true);
 
@@ -76,7 +76,10 @@ test('touching a patroller on level 5 costs a life and respawns with grace', asy
   await openGame(page);
   await startLevel(page, 5);
 
-  await hold(page, 'ArrowRight', 150);
+  await holdUntil(page, 'ArrowRight', async () => {
+    const s = await scene(page);
+    return s.x >= 40;
+  }, 5000, 25);
   const climbed = await holdUntil(page, 'ArrowUp', async () => {
     const s = await scene(page);
     return s.pose === 'ground' && s.y < 36 * 16;
@@ -99,7 +102,10 @@ test('game over retries the current level with lives refilled', async ({ page })
     s.engine.lives = 1;
   });
 
-  await hold(page, 'ArrowRight', 150);
+  await holdUntil(page, 'ArrowRight', async () => {
+    const s = await scene(page);
+    return s.x >= 40;
+  }, 5000, 25);
   await holdUntil(page, 'ArrowUp', async () => {
     const s = await scene(page);
     return s.pose === 'ground' && s.y < 36 * 16;

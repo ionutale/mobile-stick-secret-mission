@@ -71,3 +71,21 @@ export async function tapLogical(page, x, y) {
   const s = box.width / 352;
   await page.mouse.click(box.x + x * s, box.y + y * s);
 }
+
+export async function holdButton(page, x, y, ms) {
+  const box = await page.locator('#game canvas').boundingBox();
+  const s = box.width / 352;
+  await page.mouse.move(box.x + x * s, box.y + y * s);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+}
+
+export async function tapButton(page, x, y) {
+  const box = await page.locator('#game canvas').boundingBox();
+  const s = box.width / 352;
+  await page.mouse.move(box.x + x * s, box.y + y * s);
+  await page.mouse.down();
+  await page.waitForTimeout(60);
+  await page.mouse.up();
+}
