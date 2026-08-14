@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLAY_W, PLAY_H } from '../logic/constants.js';
+import { sound } from '../logic/sound.js';
 
 const INK = 0x0b110b;
 const PAPER = 0xa8e6a0;
@@ -15,6 +16,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create() {
+    this.input.on('pointerdown', () => sound.unlock());
     const bg = this.add.graphics();
     bg.fillStyle(PAPER, 1);
     bg.fillRect(0, 0, PLAY_W, PLAY_H);

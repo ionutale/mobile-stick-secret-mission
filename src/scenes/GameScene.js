@@ -3,6 +3,7 @@ import { TILE, PLAY_W, PLAY_H } from '../logic/constants.js';
 import { Game, STATUS, POSE, STICK_W, STICK_H, ENEMY_SIZE } from '../logic/game.js';
 import { LEVELS } from '../logic/levels.js';
 import { loadProgress, saveProgress } from '../logic/progress.js';
+import { sound, soundForEvent } from '../logic/sound.js';
 
 const INK = 0x0b110b;
 const PAPER = 0xa8e6a0;
@@ -63,6 +64,10 @@ export class GameScene extends Phaser.Scene {
     this.makeButtons();
     this.makeKeyboard();
     this.hintTimer = HINTS[this.levelNum] ? 0.4 : -1;
+    this.lastCount = -1;
+
+    this.input.on('pointerdown', () => sound.unlock());
+    this.input.keyboard.on('keydown', () => sound.unlock());
   }
 
   makeButtons() {
@@ -151,6 +156,7 @@ export class GameScene extends Phaser.Scene {
   update(time, delta) {
     const dt = delta / 1000;
     const engine = this.engine;
+    if (this.edges.jumpEdge) sound.play('jump');
     engine.step(this.readInput(), dt);
     this.edges.jumpEdge = false;
     this.edges.grabEdge = false;
@@ -164,10 +170,19 @@ export class GameScene extends Phaser.Scene {
     if (engine.status === STATUS.WON || engine.status === STATUS.GAMEOVER) {
       this.resultTimer += dt;
     }
+    if (engine.status === STATUS.COUNTDOWN) {
+      const n = Math.ceil(engine.countdownT);
+      if (n !== this.lastCount) {
+        this.lastCount = n;
+        sound.play(n > 0 ? 'tick' : 'go');
+      }
+    }
   }
 
   processEvents() {
     for (const ev of this.engine.events) {
+      const snd = soundForEvent(ev.type);
+      if (snd) sound.play(snd);
       if (ev.type === 'levelComplete') this.saveProgress();
       if (ev.type === 'gameover') this.saveProgress();
     }
