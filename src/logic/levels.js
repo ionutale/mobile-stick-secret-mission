@@ -1,0 +1,22 @@
+import l01 from '../../levels/01.json';
+import l02 from '../../levels/02.json';
+import l03 from '../../levels/03.json';
+import l04 from '../../levels/04.json';
+import l05 from '../../levels/05.json';
+import l06 from '../../levels/06.json';
+import l07 from '../../levels/07.json';
+import l08 from '../../levels/08.json';
+import l09 from '../../levels/09.json';
+import l10 from '../../levels/10.json';
+import l11 from '../../levels/11.json';
+import l12 from '../../levels/12.json';
+import l13 from '../../levels/13.json';
+import l14 from '../../levels/14.json';
+import l15 from '../../levels/15.json';
+import l16 from '../../levels/16.json';
+import l17 from '../../levels/17.json';
+import l18 from '../../levels/18.json';
+import l19 from '../../levels/19.json';
+import l20 from '../../levels/20.json';
+
+export const LEVELS = [l01, l02, l03, l04, l05, l06, l07, l08, l09, l10, l11, l12, l13, l14, l15, l16, l17, l18, l19, l20];

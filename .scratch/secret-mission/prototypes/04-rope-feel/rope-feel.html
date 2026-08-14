@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Rope Feel Prototype</title>
+<style>
+  :root { --bg:#0b110b; --fg:#a8e6a0; --dim:#4f7a4a; --acc:#e8f5e0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    background:var(--bg); color:var(--fg);
+    font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    display:flex; flex-direction:column; align-items:center;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    overflow:hidden;
+  }
+  .wrap { display:flex; flex-direction:column; align-items:center; gap:8px; padding:8px; max-width:420px; width:100%; }
+  h1 { font-size:15px; letter-spacing:1px; color:var(--acc); }
+  .intro { font-size:11px; color:var(--dim); line-height:1.45; text-align:center; }
+  .modes { display:flex; gap:8px; }
+  .modes button {
+    background:transparent; color:var(--fg); border:1px solid var(--dim);
+    padding:6px 10px; font-family:inherit; font-size:12px; letter-spacing:1px;
+  }
+  .modes button.on { border-color:var(--acc); color:var(--acc); background:rgba(168,230,160,.08); }
+  canvas { background:#0a0f0a; border:1px solid var(--dim); width:100%; max-width:400px; touch-action:none; }
+  .panel { width:100%; max-width:400px; font-size:11px; line-height:1.6; color:var(--dim); }
+  .panel b { color:var(--fg); font-weight:normal; }
+  .panel .hl { color:var(--acc); }
+  .keys { font-size:10px; color:var(--dim); text-align:center; line-height:1.5; }
+  .ctrl {
+    width:100%; max-width:400px; display:flex; justify-content:space-between; gap:6px;
+  }
+  .ctrl .col { display:flex; gap:6px; }
+  .ctrl button {
+    background:transparent; color:var(--fg); border:1px solid var(--dim);
+    min-width:56px; min-height:56px; font-family:inherit; font-size:13px;
+    border-radius:6px;
+  }
+  .ctrl button:active { background:rgba(168,230,160,.15); border-color:var(--acc); }
+  .hint { font-size:10px; color:var(--dim); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ROPE FEEL PROTOTYPE</h1>
+  <p class="intro">Question: which rope behavior feels right for the game — <b>hang-and-climb</b> or <b>pendulum swing</b>?
+  Climb the ladder, jump across the gap using the rope, try both modes, and judge the feel.</p>
+  <div class="modes">
+    <button id="mHang">HANG &amp; CLIMB</button>
+    <button id="mSwing">SWING</button>
+  </div>
+  <canvas id="cv" width="360" height="520"></canvas>
+  <div class="panel" id="panel"></div>
+  <div class="ctrl">
+    <div class="col">
+      <button data-k="left">&#9664;</button>
+      <button data-k="right">&#9654;</button>
+    </div>
+    <div class="col">
+      <button data-k="up">&#9650;</button>
+      <button data-k="down">&#9660;</button>
+      <button data-k="jump">JUMP</button>
+      <button data-k="grab">GRAB</button>
+    </div>
+  </div>
+  <p class="keys">Keyboard: arrows move / climb &#183; SPACE jump &#183; X grab/release rope &#183; Z reset</p>
+</div>
+<script>
+(function(){
+"use strict";
+
+var G = 900;        // gravity px/s^2
+var WALK = 130;     // walk speed px/s
+var JUMPV = 380;    // jump velocity px/s
+var CLIMB = 85;     // climb speed px/s
+var ROPECLIMB = 70; // rope climb speed px/s
+var PUMP = 9;       // swing pump angular accel (rad/s^2)
+var DAMP = 0.999;   // swing damping per frame
+
+var W = 360, H = 520;
+var GROUND = 470;
+var LEFT = { x1: 20, x2: 165, y: 380 };
+var RIGHT = { x1: 195, x2: 340, y: 300 };
+var LADDER = { x: 78, top: 380, bot: 470 };
+var ROPE = { ax: 180, ay: 80, len: 215 };
+
+var STATE = { grounded:0, air:1, climb:2, rope:3 };
+
+function Sim(){
+  this.reset();
+}
+Sim.prototype.reset = function(){
+  this.mode = "hang";           // "hang" | "swing"
+  this.x = 60; this.y = GROUND - 40;
+  this.vx = 0; this.vy = 0;
+  this.state = STATE.grounded;
+  this.grabPos = 0;             // hang: offset from rope top
+  this.theta = 0; this.omega = 0; // swing: angle from vertical (rad), angular vel
+  this.fell = false;
+};
+Sim.prototype.action = function(k, down){
+  if (k === "reset") { this.reset(); return; }
+  if (!down) { if (k === "grab") this.release(); return; }
+  switch (k) {
+    case "left":  this.move(-1, true); break;
+    case "right": this.move( 1, true); break;
+    case "up":    this.climb(-1); break;
+    case "down":  this.climb( 1); break;
+    case "jump":  this.jump(); break;
+    case "grab":  this.grab(); break;
+  }
+};
+Sim.prototype.release = function(){
+  if (this.state === STATE.rope) {
+    if (this.mode === "swing") {
+      var L = this.ropeLen();
+      var tangentX = Math.cos(this.theta), tangentY = -Math.sin(this.theta);
+      var sp = L * this.omega;
+      this.vx = tangentX * sp;
+      this.vy = tangentY * sp;
+      this.x = this.ropePx() - 20;
+      this.y = this.ropePy() - 20;
+      this.state = STATE.air;
+    } else {
+      this.state = STATE.air;
+      this.vx = 0; this.vy = 0;
+      this.y += 4;
+    }
+  }
+};
+Sim.prototype.ropeLen = function(){ return this.mode === "swing" ? ROPE.len : ROPE.len; };
+Sim.prototype.ropeAx = function(){ return ROPE.ax; };
+Sim.prototype.ropeAy = function(){ return ROPE.ay; };
+Sim.prototype.ropePx = function(){ return ROPE.ax + Math.sin(this.theta) * this.ropeLen(); };
+Sim.prototype.ropePy = function(){ return ROPE.ay + Math.cos(this.theta) * this.ropeLen(); };
+Sim.prototype.ropeBottom = function(){ return ROPE.ay + ROPE.len; };
+Sim.prototype.move = function(dir, down){
+  if (!down) return;
+  if (this.state === STATE.rope) {
+    if (this.mode === "swing") { this.omega += dir * PUMP * 0.016; this.omega = Math.max(-6, Math.min(6, this.omega)); return; }
+    this.release();
+    this.vx = dir * WALK * 0.5;
+    return;
+  }
+  if (this.state === STATE.grounded) { this.vx = dir * WALK; }
+  else if (this.state === STATE.air) { this.vx = dir * WALK; }
+  else if (this.state === STATE.climb) {
+    if (dir !== 0) { this.state = STATE.air; this.vx = dir * WALK; this.vy = 0; }
+  }
+};
+Sim.prototype.jump = function(){
+  if (this.state === STATE.grounded) { this.vy = -JUMPV; this.state = STATE.air; }
+  else if (this.state === STATE.climb) { this.state = STATE.air; this.vx = 0; this.vy = -JUMPV; }
+  else if (this.state === STATE.rope) {
+    this.release();
+    this.vy = -JUMPV * 0.7;
+  }
+};
+Sim.prototype.climb = function(dir){
+  if (this.state === STATE.grounded) {
+    if (Math.abs(this.x + 20 - LADDER.x) < 16) { this.state = STATE.climb; this.x = LADDER.x - 20; }
+    return;
+  }
+  if (this.state === STATE.climb) {
+    var y = this.y + dir * CLIMB * 0.016;
+    y = Math.max(LADDER.top - 40, Math.min(LADDER.bot - 40, y));
+    this.y = y;
+    if (y <= LADDER.top - 40 + 0.5) { this.state = STATE.grounded; this.y = LADDER.top - 40; }
+    if (y >= LADDER.bot - 40 - 0.5) { this.state = STATE.grounded; this.y = LADDER.bot - 40; }
+    return;
+  }
+  if (this.state === STATE.air && this.y + 40 > LADDER.top && this.y + 40 < LADDER.bot && Math.abs(this.x + 20 - LADDER.x) < 22) {
+    this.state = STATE.climb; this.x = LADDER.x - 20; this.vx = 0; this.vy = 0;
+  }
+  if (this.state === STATE.rope) {
+    if (this.mode === "hang") {
+      this.grabPos = Math.max(0, Math.min(ROPE.len - 40, this.grabPos + dir * ROPECLIMB * 0.016));
+      if (this.grabPos >= ROPE.len - 40) { this.grabPos = ROPE.len - 40; this.state = STATE.grounded; this.y = ROPE.ay + this.grabPos; this.x = this.ropePx() - 20; }
+    }
+  }
+};
+Sim.prototype.grab = function(){
+  if (this.state === STATE.rope) { this.release(); return; }
+  var cx = this.x + 20, cy = this.y + 20;
+  if (this.mode === "hang") {
+    var bottom = this.ropeBottom();
+    if (Math.abs(cx - ROPE.ax) < 22 && cy >= ROPE.ay - 10 && cy <= bottom + 10) {
+      this.state = STATE.rope;
+      this.grabPos = Math.max(0, Math.min(ROPE.len - 40, cy - ROPE.ay));
+      this.x = ROPE.ax - 20; this.vy = 0; this.vx = 0;
+      return;
+    }
+  } else {
+    var px = this.ropePx(), py = this.ropePy();
+    var dx = cx - px, dy = cy - py;
+    if (Math.sqrt(dx*dx + dy*dy) < 34) {
+      this.state = STATE.rope;
+      var t = Math.atan2(cx - ROPE.ax, py - ROPE.ay);
+      this.theta = Math.max(-1.35, Math.min(1.35, Math.atan2(cx - ROPE.ax, cy - ROPE.ay)));
+      var cxr = ROPE.ax + Math.sin(this.theta) * ROPE.len;
+      var cyr = ROPE.ay + Math.cos(this.theta) * ROPE.len;
+      var rx = cx - cxr, ry = cy - cyr;
+      var tangX = Math.cos(this.theta), tangY = -Math.sin(this.theta);
+      this.omega = (rx * tangX + ry * tangY) / (ROPE.len) * 3;
+      this.x = cxr - 20; this.y = cyr - 20;
+      this.vx = 0; this.vy = 0;
+    }
+  }
+};
+Sim.prototype.step = function(dt){
+  if (this.fell) return;
+  if (this.state === STATE.rope && this.mode === "swing") {
+    var a = -(G / ROPE.len) * Math.sin(this.theta);
+    this.omega += a * dt;
+    this.omega *= Math.pow(DAMP, dt * 60);
+    this.theta += this.omega * dt;
+    var px = this.ropePx(), py = this.ropePy();
+    this.x = px - 20; this.y = py - 20;
+    return;
+  }
+  if (this.state === STATE.rope && this.mode === "hang") {
+    var gx = ROPE.ax, gy = ROPE.ay + this.grabPos;
+    this.x = gx - 20; this.y = gy - 20;
+    return;
+  }
+  if (this.state === STATE.climb) return;
+  this.vy += G * dt;
+  this.x += this.vx * dt;
+  this.y += this.vy * dt;
+  if (this.state === STATE.grounded) {
+    this.x = Math.max(0, Math.min(W - 40, this.x));
+    if (this.y + 40 > GROUND) { this.y = GROUND - 40; this.vy = 0; }
+    var onL = this.y + 40 >= LEFT.y && this.x + 40 > LEFT.x1 && this.x < LEFT.x2 && this.vy >= 0;
+    var onR = this.y + 40 >= RIGHT.y && this.x + 40 > RIGHT.x1 && this.x < RIGHT.x2 && this.vy >= 0;
+    if (onL || onR) { this.y = (onL ? LEFT.y : RIGHT.y) - 40; this.vy = 0; }
+    else if (this.y + 40 < GROUND - 2 && this.vy > 0) {
+      if (this.y + 40 > LEFT.y - 6 && this.y + 40 < LEFT.y + 24 && this.x + 40 > LEFT.x1 && this.x < LEFT.x2) { this.y = LEFT.y - 40; this.vy = 0; }
+      else if (this.y + 40 > RIGHT.y - 6 && this.y + 40 < RIGHT.y + 24 && this.x + 40 > RIGHT.x1 && this.x < RIGHT.x2) { this.y = RIGHT.y - 40; this.vy = 0; }
+      else { this.state = STATE.air; }
+    }
+  } else if (this.state === STATE.air) {
+    var landed = false;
+    var gy = this.y + 40;
+    if (this.vy >= 0) {
+      if (gy >= GROUND) { this.y = GROUND - 40; this.state = STATE.grounded; this.vy = 0; landed = true; }
+      else if (gy >= LEFT.y && gy <= LEFT.y + 18 && this.x + 40 > LEFT.x1 && this.x < LEFT.x2) { this.y = LEFT.y - 40; this.state = STATE.grounded; this.vy = 0; landed = true; }
+      else if (gy >= RIGHT.y && gy <= RIGHT.y + 18 && this.x + 40 > RIGHT.x1 && this.x < RIGHT.x2) { this.y = RIGHT.y - 40; this.state = STATE.grounded; this.vy = 0; landed = true; }
+    }
+    if (!landed && this.x < -30) this.x = W - 10;
+    if (!landed && this.x > W + 10) this.x = 10;
+    if (!landed && this.y > H + 60) { this.fell = true; }
+  }
+};
+
+var sim = new Sim();
+var cv = document.getElementById("cv");
+var ctx = cv.getContext("2d");
+var panel = document.getElementById("panel");
+
+function draw(){
+  ctx.fillStyle = "#0a0f0a";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#a8e6a0";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W - 2, H - 2);
+  ctx.fillStyle = "#a8e6a0";
+  ctx.fillRect(0, GROUND, W, H - GROUND);
+  ctx.fillStyle = "#0a0f0a";
+  ctx.fillRect(LEFT.x1, LEFT.y, LEFT.x2 - LEFT.x1, 8);
+  ctx.fillRect(RIGHT.x1, RIGHT.y, RIGHT.x2 - RIGHT.x1, 8);
+  for (var i = 0; i < 6; i++) ctx.fillRect(LADDER.x - 6 + (i % 2) * 8, LADDER.top + 8 + i * 13, 4, 8);
+  ctx.strokeStyle = "#4f7a4a";
+  ctx.beginPath();
+  ctx.moveTo(ROPE.ax, ROPE.ay);
+  ctx.lineTo(sim.ropePx(), sim.ropePy());
+  ctx.stroke();
+  ctx.fillStyle = "#4f7a4a";
+  ctx.fillRect(ROPE.ax - 3, ROPE.ay - 3, 6, 6);
+  if (sim.fell) {
+    ctx.fillStyle = "#a8e6a0";
+    ctx.font = "14px monospace";
+    ctx.fillText("FELL INTO THE GAP - press Z or RESET", 30, 260);
+  } else {
+    var sx = sim.x, sy = sim.y;
+    ctx.strokeStyle = "#e8f5e0";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(sx + 4, sy + 38); ctx.lineTo(sx + 16, sy + 38);
+    ctx.moveTo(sx + 10, sy + 10); ctx.lineTo(sx + 10, sy + 38);
+    ctx.moveTo(sx + 10, sy + 14); ctx.lineTo(sx + 2, sy + 24);
+    ctx.moveTo(sx + 10, sy + 14); ctx.lineTo(sx + 18, sy + 24);
+    ctx.moveTo(sx + 10, sy + 26); ctx.lineTo(sx + 2, sy + 38);
+    ctx.moveTo(sx + 10, sy + 26); ctx.lineTo(sx + 18, sy + 38);
+    ctx.stroke();
+  }
+}
+
+var names = {0:"standing", 1:"airborne", 2:"climbing", 3:"on rope"};
+function renderPanel(){
+  var s = sim;
+  var st = names[s.state];
+  if (s.fell) st = "fell (reset with Z)";
+  var info =
+    "MODE: <b>" + (s.mode === "hang" ? "HANG &amp; CLIMB" : "SWING") + "</b> | STATE: <b>" + st + "</b><br>" +
+    "x:<b>" + s.x.toFixed(0) + "</b> y:<b>" + s.y.toFixed(0) + "</b> | vx:<b>" + s.vx.toFixed(0) + "</b> vy:<b>" + s.vy.toFixed(0) + "</b><br>";
+  if (s.state === STATE.rope && s.mode === "swing") {
+    info += "rope angle: <b>" + (s.theta * 57.3).toFixed(1) + "&deg;</b> | swing speed: <b>" + (s.omega * s.ropeLen()).toFixed(0) + " px/s</b> &nbsp;<span class='hl'>pump with LEFT/RIGHT</span>";
+  } else if (s.state === STATE.rope) {
+    info += "grab height: <b>" + s.grabPos.toFixed(0) + "/" + ROPE.len + "</b> &nbsp;<span class='hl'>climb with UP/DOWN</span>";
+  }
+  info += "<br>constants: g=<b>" + G + "</b> walk=<b>" + WALK + "</b> jump=<b>" + JUMPV + "</b> rope len=<b>" + ROPE.len + "</b>";
+  panel.innerHTML = info;
+}
+
+var last = performance.now();
+function loop(t){
+  var dt = Math.min(0.033, (t - last) / 1000);
+  last = t;
+  sim.step(dt);
+  draw();
+  renderPanel();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+var keys = {};
+document.addEventListener("keydown", function(e){
+  var k = { ArrowLeft:"left", ArrowRight:"right", ArrowUp:"up", ArrowDown:"down", " ": "jump", x:"grab", z:"reset" }[e.key];
+  if (k) { e.preventDefault(); sim.action(k, true); keys[k] = true; }
+});
+document.addEventListener("keyup", function(e){
+  var k = { ArrowLeft:"left", ArrowRight:"right", ArrowUp:"up", ArrowDown:"down", " ": "jump", x:"grab" }[e.key];
+  if (k) { keys[k] = false; if (k === "grab") sim.action(k, false); }
+});
+
+document.querySelectorAll(".ctrl button").forEach(function(b){
+  var k = b.dataset.k;
+  var on = function(e){ e.preventDefault(); sim.action(k, true); keys[k] = true; };
+  var off = function(e){ e.preventDefault(); keys[k] = false; if (k === "grab") sim.action(k, false); };
+  b.addEventListener("touchstart", on, {passive:false});
+  b.addEventListener("touchend", off, {passive:false});
+  b.addEventListener("mousedown", on);
+  b.addEventListener("mouseup", off);
+  b.addEventListener("mouseleave", off);
+});
+
+var mHang = document.getElementById("mHang"), mSwing = document.getElementById("mSwing");
+function setMode(m){
+  sim.mode = m;
+  mHang.classList.toggle("on", m === "hang");
+  mSwing.classList.toggle("on", m === "swing");
+}
+mHang.addEventListener("click", function(){ setMode("hang"); });
+mSwing.addEventListener("click", function(){ setMode("swing"); });
+setMode("hang");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+export const G = 900;
+export const WALK = 130;
+export const JUMP = 380;
+export const CLIMB = 80;
+export const ROPE_GRAB_RADIUS = 22;
+export const TILE = 16;
+export const GRID_W = 22;
+export const GRID_H = 40;
+export const PLAY_W = GRID_W * TILE;
+export const PLAY_H = GRID_H * TILE;
