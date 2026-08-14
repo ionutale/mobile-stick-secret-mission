@@ -27,6 +27,9 @@ export class GameScene extends Phaser.Scene {
     this.hintTimer = 0;
     this.edges = { jumpEdge: false, grabEdge: false, digEdge: false };
     this.pressed = new Set();
+    this.walkPhase = 0;
+    this.climbPhase = 0;
+    this.animT = 0;
   }
 
   create() {
@@ -170,6 +173,10 @@ export class GameScene extends Phaser.Scene {
 
     this.processEvents();
     this.updateHint(dt);
+    const s = engine.stickman;
+    if (s.pose === POSE.GROUND) this.walkPhase += Math.abs(s.vx) * dt * 0.032;
+    if (s.pose === POSE.CLIMB) this.climbPhase += dt * 9;
+    this.animT += dt;
     this.draw();
     this.drawHUD();
 
@@ -348,13 +355,43 @@ export class GameScene extends Phaser.Scene {
     if (s.invulnT > 0 && Math.floor(this.time.now * 0.12) % 2 === 0) return;
     const cx = s.x + STICK_W / 2;
     const top = s.y;
+    const f = s.facing;
     g.lineStyle(3, INK, 1);
     g.fillStyle(INK, 1);
     g.fillCircle(cx, top + 6, 5);
     g.lineBetween(cx, top + 10, cx, top + 26);
-    g.lineBetween(cx, top + 14, cx + 6 * s.facing, top + 20);
-    g.lineBetween(cx, top + 26, cx + 5 * s.facing, top + 36);
-    g.lineBetween(cx, top + 26, cx - 5 * s.facing, top + 36);
+    const hipX = cx;
+    const hipY = top + 26;
+
+    if (s.pose === POSE.CLIMB) {
+      const q = this.climbPhase;
+      const up = Math.sin(q) > 0;
+      g.lineBetween(cx, top + 14, cx + (up ? 4 : -4), up ? top + 8 : top + 16);
+      g.lineBetween(cx, top + 14, cx + (up ? -4 : 4), up ? top + 16 : top + 8);
+      g.lineBetween(hipX, hipY, cx + 4, top + 36);
+      g.lineBetween(hipX, hipY, cx - 4, up ? top + 32 : top + 28);
+    } else if (s.pose === POSE.ROPE) {
+      g.lineBetween(cx, top + 14, cx - 4, top + 9);
+      g.lineBetween(cx, top + 14, cx + 4, top + 9);
+      const sway = Math.sin(this.animT * 4) * 2;
+      g.lineBetween(hipX, hipY, cx - 3 + sway, top + 36);
+      g.lineBetween(hipX, hipY, cx + 3 + sway, top + 36);
+    } else if (s.pose === POSE.AIR) {
+      g.lineBetween(cx, top + 14, cx + f * 4, top + 10);
+      g.lineBetween(cx, top + 14, cx - f * 4, top + 10);
+      g.lineBetween(hipX, hipY, cx + f * 6, top + 36);
+      g.lineBetween(hipX, hipY, cx - f * 4, top + 33);
+    } else {
+      const moving = Math.abs(s.vx) > 1;
+      const leg1 = moving ? Math.sin(this.walkPhase) : 0;
+      const leg2 = moving ? Math.sin(this.walkPhase + Math.PI) : 0;
+      const arm1 = moving ? Math.sin(this.walkPhase + Math.PI) : 0;
+      const arm2 = moving ? Math.sin(this.walkPhase) : 0;
+      g.lineBetween(hipX, hipY, cx + f * leg1 * 6, top + 36 - Math.max(0, leg1) * 4);
+      g.lineBetween(hipX, hipY, cx + f * leg2 * 6, top + 36 - Math.max(0, leg2) * 4);
+      g.lineBetween(cx, top + 14, cx + f * arm1 * 5, top + 22);
+      g.lineBetween(cx, top + 14, cx + f * arm2 * 5, top + 22);
+    }
   }
 
   drawHUD() {
