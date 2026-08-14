@@ -8,3 +8,5 @@ export const GRID_W = 22;
 export const GRID_H = 40;
 export const PLAY_W = GRID_W * TILE;
 export const PLAY_H = GRID_H * TILE;
+export const CONTROLS_H = 100;
+export const CANVAS_H = PLAY_H + CONTROLS_H;

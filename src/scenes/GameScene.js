@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TILE, PLAY_W, PLAY_H } from '../logic/constants.js';
+import { TILE, PLAY_W, PLAY_H, CONTROLS_H, CANVAS_H } from '../logic/constants.js';
 import { Game, STATUS, POSE, STICK_W, STICK_H, ENEMY_SIZE } from '../logic/game.js';
 import { LEVELS } from '../logic/levels.js';
 import { loadProgress, saveProgress } from '../logic/progress.js';
@@ -71,21 +71,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   makeButtons() {
-    const H = PLAY_H;
+    const stripY = PLAY_H;
     const defs = [
-      { k: 'left', x: 14, y: H - 74, w: 58, h: 66, label: '◀' },
-      { k: 'right', x: 76, y: H - 74, w: 58, h: 66, label: '▶' },
-      { k: 'jump', x: 222, y: H - 74, w: 116, h: 66, label: 'JUMP' },
-      { k: 'grab', x: 162, y: H - 148, w: 56, h: 48, label: 'GRAB' },
-      { k: 'dig', x: 162, y: H - 96, w: 56, h: 48, label: 'DIG' },
-      { k: 'up', x: 222, y: H - 148, w: 56, h: 48, label: '▲' },
-      { k: 'down', x: 222, y: H - 96, w: 56, h: 48, label: '▼' }
+      { k: 'left', x: 8, y: 30, w: 56, h: 60, label: '◀' },
+      { k: 'right', x: 68, y: 30, w: 56, h: 60, label: '▶' },
+      { k: 'grab', x: 128, y: 8, w: 52, h: 40, label: 'GRAB' },
+      { k: 'dig', x: 128, y: 52, w: 52, h: 40, label: 'DIG' },
+      { k: 'up', x: 184, y: 8, w: 52, h: 40, label: '▲' },
+      { k: 'down', x: 184, y: 52, w: 52, h: 40, label: '▼' },
+      { k: 'jump', x: 244, y: 20, w: 100, h: 64, label: 'JUMP' }
     ];
     this.buttons = {};
     for (const d of defs) {
-      const rect = this.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, INK, 0.15)
+      const rect = this.add.rectangle(d.x + d.w / 2, stripY + d.y + d.h / 2, d.w, d.h, INK, 0.15)
         .setStrokeStyle(2, INK);
-      const label = this.add.text(d.x + d.w / 2, d.y + d.h / 2, d.label, {
+      const label = this.add.text(d.x + d.w / 2, stripY + d.y + d.h / 2, d.label, {
         fontFamily: 'monospace',
         fontSize: d.label.length > 2 ? '11px' : '16px',
         color: '#0b110b'
@@ -222,6 +222,19 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(PAPER, 1);
     g.fillRect(0, 0, PLAY_W, PLAY_H);
 
+    g.fillStyle(PAPER, 1);
+    g.fillRect(0, PLAY_H, PLAY_W, CONTROLS_H);
+    g.lineStyle(2, INK, 1);
+    g.lineBetween(0, PLAY_H + 1, PLAY_W, PLAY_H + 1);
+    g.lineStyle(1, INK, 0.6);
+    for (const b of Object.values(this.buttons)) {
+      const d = b.d;
+      const x = d.x;
+      const y = PLAY_H + d.y;
+      g.fillStyle(INK, this.pressed.has(d.k) ? 0.5 : 0.15);
+      g.fillRect(x + 2, y + 2, d.w - 4, d.h - 4);
+    }
+
     const tiles = engine.parsed.tiles;
     for (let r = 0; r < engine.parsed.height; r++) {
       for (let c = 0; c < engine.parsed.width; c++) {
@@ -355,6 +368,10 @@ export class GameScene extends Phaser.Scene {
       hud.lineBetween(x, 18, x, 26);
       hud.lineBetween(x - 3, 22, x + 3, 22);
     }
+    for (const b of Object.values(this.buttons)) {
+      b.rect.setFillStyle(INK, this.pressed.has(b.d.k) ? 0.5 : 0.15);
+    }
+    this.pauseBtn.rect.setFillStyle(INK, 0.15);
     this.timeText.setText(`TIME ${String(Math.max(0, Math.ceil(engine.timeLeft))).padStart(3, '0')}`);
     this.livesText.setText('');
   }

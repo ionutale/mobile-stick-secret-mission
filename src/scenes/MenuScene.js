@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PLAY_W, PLAY_H } from '../logic/constants.js';
+import { PLAY_W, PLAY_H, CANVAS_H } from '../logic/constants.js';
 import { sound } from '../logic/sound.js';
 
 const INK = 0x0b110b;
@@ -19,7 +19,7 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('pointerdown', () => sound.unlock());
     const bg = this.add.graphics();
     bg.fillStyle(PAPER, 1);
-    bg.fillRect(0, 0, PLAY_W, PLAY_H);
+    bg.fillRect(0, 0, PLAY_W, CANVAS_H);
 
     this.add.text(PLAY_W / 2, 70, 'SECRET MISSION', {
       fontFamily: 'monospace',
@@ -58,7 +58,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    this.add.text(PLAY_W / 2, PLAY_H - 34, 'collect all diamonds, open the door', {
+    this.add.text(PLAY_W / 2, CANVAS_H - 34, 'collect all diamonds, open the door', {
       fontFamily: 'monospace',
       fontSize: '10px',
       color: DIM
