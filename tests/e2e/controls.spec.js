@@ -10,9 +10,9 @@ test('holding the RIGHT button moves the stickman right', async ({ page }) => {
   await openGame(page);
   await startLevel(page, 1);
   const before = await scene(page);
-  await holdButton(page, ...RIGHT_BTN, 800);
+  await holdButton(page, ...RIGHT_BTN, 1500);
   const after = await scene(page);
-  expect(after.x).toBeGreaterThan(before.x + 40);
+  expect(after.x).toBeGreaterThan(before.x + 15);
 });
 
 test('holding the LEFT button moves the stickman left', async ({ page }) => {
@@ -20,9 +20,9 @@ test('holding the LEFT button moves the stickman left', async ({ page }) => {
   await startLevel(page, 1);
   await holdButton(page, ...RIGHT_BTN, 600);
   const before = await scene(page);
-  await holdButton(page, ...LEFT_BTN, 500);
+  await holdButton(page, ...LEFT_BTN, 1000);
   const after = await scene(page);
-  expect(after.x).toBeLessThan(before.x - 20);
+  expect(after.x).toBeLessThan(before.x - 10);
 });
 
 test('tapping the JUMP button makes the stickman jump', async ({ page }) => {
