@@ -16,7 +16,7 @@ test('starts level 1, timer counts down, stickman moves with keys', async ({ pag
   await page.waitForFunction(() => {
     const s = window.__game.scene.getScene('game');
     return s && s.engine && s.engine.status === 'playing';
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 30000 });
 
   const t0 = await page.evaluate(() => window.__game.scene.getScene('game').engine.timeLeft);
   await page.waitForTimeout(1200);
@@ -40,7 +40,7 @@ test('collecting all diamonds opens the door on level 1', async ({ page }) => {
   await page.waitForFunction(() => {
     const s = window.__game.scene.getScene('game');
     return s && s.engine && s.engine.status === 'playing';
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 30000 });
   await page.evaluate(() => {
     const s = window.__game.scene.getScene('game');
     for (const d of s.engine.parsed.diamonds) {

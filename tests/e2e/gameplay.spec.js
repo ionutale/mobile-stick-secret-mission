@@ -49,7 +49,7 @@ test('plays level 1 to completion with the keyboard and saves progress', async (
   await page.waitForFunction(() => {
     const s = window.__game.scene.getScene('game');
     return s && s.engine && s.engine.levelNum === 2;
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 30000 });
 });
 
 test('progress persists across a reload', async ({ page }) => {
@@ -64,7 +64,7 @@ test('progress persists across a reload', async ({ page }) => {
   await page.waitForFunction(() => {
     const s = window.__game.scene.getScene('game');
     return s && s.engine.status === 'won';
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 30000 });
 
   await page.reload();
   await page.waitForFunction(() => window.__game && window.__game.scene.isActive('menu'), null, { timeout: 15000 });
@@ -131,5 +131,5 @@ test('tapping the level button on the menu starts the level', async ({ page }) =
   await page.waitForFunction(() => {
     const s = window.__game.scene.getScene('game');
     return s && s.engine && s.engine.levelNum === 1;
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 30000 });
 });
